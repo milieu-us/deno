@@ -10,7 +10,7 @@ use msg_generated::deno as msg;
 use std;
 use std::path::Path;
 use hyper;
-use hyper::rt::{self, Future, Stream};
+use hyper::rt::{Future, Stream};
 use hyper::Client;
 use tokio::prelude::future;
 
@@ -227,54 +227,39 @@ fn handle_fetch_req(
   id: u32,
   url: &str,
 ) {
-  let req = fetch_url(d, id.clone(), url);
-  rt::run(req);
-}
-
-fn fetch_url(
-  d: *const DenoC,
-  id: u32,
-  url: &str,
-) -> impl Future<Item = (), Error = ()> {
+  let deno = from_c(d);
   let url = url.parse::<hyper::Uri>().unwrap();
   let client = Client::new();
 
-  client
+  let req = client
     .get(url)
-    .map(|res| {
-      // Borrow problems ahead
+    .map(move |res| {
+      let status = res.status().as_u16() as i32;
 
-      // res.into_body().concat2()
-      //   .map(|body| {
-      //     let status = res.status().as_u16() as i32;
-      //     let headers = res.headers();
-      //     let b = String::from_utf8_lossy(&body).to_string();
-
-      //     let mut builder = flatbuffers::FlatBufferBuilder::new();
-      //     let msg = msg::CreateFetchRes(
-      //       &mut builder,
-      //       &msg::FetchResArgs {
-      //         id,
-      //         status,
-      //     //   &status,
-      //     //   &headers,
-      //     //   &body
-      //         ..Default::default()
-      //       },
-      //     );
-      //     builder.finish(msg);
-      //     // send_base(
-      //     //   d,
-      //     //   &mut builder,
-      //     //   &msg::BaseArgs {
-      //     //     msg: Some(msg.union()),
-      //     //     msg_type: msg::Any::FetchRes,
-      //     //     ..Default::default()
-      //     //   },
-      //     // );
-      //   });
+      let mut builder = flatbuffers::FlatBufferBuilder::new();
+      let msg = msg::CreateFetchRes(
+        &mut builder,
+        &msg::FetchResArgs {
+          id,
+          status,
+          ..Default::default()
+        },
+      );
+      builder.finish(msg);
+      send_base(
+         d,
+         &mut builder,
+         &msg::BaseArgs {
+           msg: Some(flatbuffers::Offset::new(msg.value())),
+           msg_type: msg::Any::FetchRes,
+           ..Default::default()
+         },
+      );
     })
-    .map_err(|err| {})
+    .map_err(|err| {
+      unimplemented!();
+    });
+  deno.rt.spawn(req);
 }
 
 fn set_timeout<F>(

@@ -26,7 +26,7 @@ function onMessage(ui8: Uint8Array) {
     case fbs.Any.FetchRes: {
       const msg = new fbs.FetchRes();
       assert(base.msg(msg) != null);
-      onFetchRes(msg);
+      onFetchRes(base, msg);
       break;
     }
     case fbs.Any.TimerReady: {

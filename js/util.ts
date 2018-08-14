@@ -1,7 +1,7 @@
 // Copyright 2018 the Deno authors. All rights reserved. MIT license.
 
 //import { debug } from "./main";
-const debug = false;
+const debug = true;
 
 import { TypedArray } from "./types";
 

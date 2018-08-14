@@ -13,11 +13,11 @@ import { Request, Response, Blob, RequestInit, FormData } from "./fetch_types";
 import { TextDecoder } from "./text_encoding";
 
 /** @internal */
-export function onFetchRes(msg: fbs.FetchRes) {
+export function onFetchRes(base: fbs.Base, msg: fbs.FetchRes) {
   const id = msg.id();
   const f = fetchRequests.get(id);
   assert(f != null, `Couldn't find FetchRequest id ${id}`);
-  f.onMsg(msg);
+  f.onMsg(base, msg);
   fetchRequests.delete(id);
 }
 
@@ -76,20 +76,20 @@ class FetchResponse implements Response {
   onHeader: (res: Response) => void;
   onError: (error: Error) => void;
 
-  onMsg(msg: any) {
-    if (msg.error !== null && msg.error !== "") {
-      //throw new Error(msg.error)
-      this.onError(new Error(msg.error));
+  onMsg(base: fbs.Base, msg: fbs.FetchRes) {
+    let error = base.error();
+    if (error != null) {
+      this.onError(new Error(error));
       return;
     }
 
     if (this.first) {
       this.first = false;
-      this.status = msg.fetchResStatus;
+      this.status = msg.status();
       //this.onHeader(this);
     } else {
       // Body message. Assuming it all comes in one message now.
-      const ab = typedArrayToArrayBuffer(msg.fetchResBody);
+      const ab = typedArrayToArrayBuffer(msg.bodyArray());
       this.bodyWaiter.resolve(ab);
     }
   }
@@ -106,8 +106,8 @@ class FetchRequest {
     this.response = new FetchResponse(this);
   }
 
-  onMsg(msg: any) {
-    this.response.onMsg(msg);
+  onMsg(base: fbs.Base, msg: fbs.FetchRes) {
+    this.response.onMsg(base, msg);
   }
 
   destroy() {
@@ -129,8 +129,9 @@ class FetchRequest {
     fbs.Base.addMsgType(builder, fbs.Any.FetchReq);
     builder.finish(fbs.Base.endBase(builder));
     const resBuf = libdeno.send(builder.asUint8Array());
+    assert(resBuf == null);
 
-    console.log("FetchReq sent", builder);
+    //console.log("FetchReq sent", builder);
   }
 }
 
